@@ -14,6 +14,12 @@ service cloud.firestore {
       );
     }
 
+    match /publicBookings/{bookingId} {
+      // Public calendar: only date, time, and availability are stored here.
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     match /bookings/{bookingId} {
       // Any signed-in user can read approved bookings and their own requests.
       // Admin can read all requests.
