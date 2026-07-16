@@ -33,17 +33,38 @@ function updateAuthBox(){
   $("#adminNav").style.display=isAdmin()?"":"none";
 }
 function render(){
-  const pending=data.filter(x=>x.status==="pending"), approved=data.filter(x=>x.status==="approved");
-  $("#total").textContent=data.length;$("#pendingNo").textContent=pending.length;$("#approvedNo").textContent=approved.length;$("#pCount").textContent=pending.length?"("+pending.length+")":"";
+  const pending=data.filter(function(x){return x.status==="pending"}), approved=data.filter(function(x){return x.status==="approved"});
+  $("#total").textContent=data.length;
+  $("#pendingNo").textContent=pending.length;
+  $("#approvedNo").textContent=approved.length;
+  $("#pCount").textContent=pending.length?"("+pending.length+")":"";
   $("#month").textContent=month.toLocaleDateString("th-TH",{month:"long",year:"numeric"});
-  let start=new Date(month.getFullYear(),month.getMonth(),1);start.setDate(1-start.getDay());let html="";
-  for(let i=0;i<42;i++){let d=new Date(start);d.setDate(start.getDate()+i);let date=key(d),items=data.filter(x=>x.date===date),cl=(d.getMonth()!==month.getMonth()?"mute ":"")+(date===chosen?"sel":"");html+='<button class="'+cl+'" data-date="'+date+'">'+d.getDate()+(items.length?'<i class="dot '+(items.some(x=>x.status==="pending")?"wait":"")+'"></i>':"")+"</button>"}
-  $("#days").innerHTML=html;document.querySelectorAll("[data-date]").forEach(x=>x.onclick=()=>{chosen=x.dataset.date;render();openForm(chosen)});
-  const today=data.filter(x=>x.date===chosen);
-  $("#dayTitle").textContent=th(new Date(chosen+"T00:00:00"));$("#dayCount").textContent=today.length?today.length+" รายการจอง":"ยังไม่มีรายการจอง";
-  $("#bookings").innerHTML=today.length?today.map(x=>'<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+x.title+'</b><span>'+x.person+" · "+x.dept+'</span><em class="status '+(x.status==="approved"?"ok":"waits")+'">'+statusLabel(x.status)+"</em></div></article>").join(""):'<p style="text-align:center;color:#98a5b6;padding:80px 0;font-size:12px">ยังไม่มีรายการจอง<br><br>คลิกวันที่เพื่อสร้างคำขอจอง</p>';
-  $("#pendingList").innerHTML=pending.length?pending.map(x=>'<article class="request"><div class="rIcon">▦</div><div class="rmain"><b>'+x.title+'</b><span>วันที่ '+th(new Date(x.date+"T00:00:00"))+" · เวลา "+x.time+'</span><small>ผู้จอง: '+x.person+" · "+x.dept+"</small></div><div class="actions"><button class="approve" data-ok="+x.id+">✓ อนุมัติ</button><button class="reject" data-no="+x.id+">ไม่อนุมัติ</button></div></article>").join(""):'<p style="text-align:center;color:#98a5b6;padding:50px">ไม่มีคำขอรออนุมัติ</p>';
-  document.querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>decide(b.dataset.ok,"approved"));document.querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>decide(b.dataset.no,"rejected"));
+  let start=new Date(month.getFullYear(),month.getMonth(),1);
+  start.setDate(1-start.getDay());
+  let calendarHtml="";
+  for(let i=0;i<42;i++){
+    const d=new Date(start);d.setDate(start.getDate()+i);
+    const date=key(d),items=data.filter(function(x){return x.date===date});
+    const classes=(d.getMonth()!==month.getMonth()?"mute ":"")+(date===chosen?"sel":"");
+    const dot=items.length?'<i class="dot '+(items.some(function(x){return x.status==="pending"})?"wait":"")+'"></i>':"";
+    calendarHtml+='<button class="'+classes+'" data-date="'+date+'">'+d.getDate()+dot+"</button>";
+  }
+  $("#days").innerHTML=calendarHtml;
+  document.querySelectorAll("[data-date]").forEach(function(button){
+    button.onclick=function(){chosen=button.dataset.date;render();openForm(chosen)};
+  });
+  const selected=data.filter(function(x){return x.date===chosen});
+  $("#dayTitle").textContent=th(new Date(chosen+"T00:00:00"));
+  $("#dayCount").textContent=selected.length?selected.length+" รายการจอง":"ยังไม่มีรายการจอง";
+  $("#bookings").innerHTML=selected.length?selected.map(function(x){
+    const style=x.status==="approved"?"ok":"waits";
+    return '<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+x.title+'</b><span>'+x.person+" · "+x.dept+'</span><em class="status '+style+'">'+statusLabel(x.status)+"</em></div></article>";
+  }).join(""):'<p style="text-align:center;color:#98a5b6;padding:80px 0;font-size:12px">ยังไม่มีรายการจอง<br><br>คลิกวันที่เพื่อสร้างคำขอจอง</p>';
+  $("#pendingList").innerHTML=pending.length?pending.map(function(x){
+    return "<article class='request'><div class='rIcon'>▦</div><div class='rmain'><b>" + x.title + "</b><span>วันที่ " + th(new Date(x.date+"T00:00:00")) + " · เวลา " + x.time + "</span><small>ผู้จอง: " + x.person + " · " + x.dept + "</small></div><div class='actions'><button class='approve' data-ok='" + x.id + "'>✓ อนุมัติ</button><button class='reject' data-no='" + x.id + "'>ไม่อนุมัติ</button></div></article>";
+  }).join(""):"<p style='text-align:center;color:#98a5b6;padding:50px'>ไม่มีคำขอรออนุมัติ</p>";
+  document.querySelectorAll("[data-ok]").forEach(function(button){button.onclick=function(){decide(button.dataset.ok,"approved")}});
+  document.querySelectorAll("[data-no]").forEach(function(button){button.onclick=function(){decide(button.dataset.no,"rejected")}});
 }
 function clearSubscriptions(){unsubs.forEach(fn=>fn());unsubs=[]}
 function subscribeBookings(){
