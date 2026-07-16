@@ -3,7 +3,7 @@
 </style></head><body><div class="app"><aside class="side"><div class="brand"><div class="mark">F</div><div><b>Finance Hub</b><small>Accounting & Finance</small></div></div><button class="nav active" id="calNav">▣ &nbsp; ปฏิทินห้องประชุม</button><button class="nav" id="adminNav">✓ &nbsp; รายการรออนุมัติ <span id="pCount"></span></button><footer>ระบบจองห้องประชุม<br>ฝ่ายบัญชีและการเงิน</footer></aside><main class="main"><header class="top"><div><span class="eyebrow">FINANCE HUB / MEETING ROOMS</span><h1 id="title">ปฏิทินห้องประชุม</h1></div><div id="authBox" class="auth-box"></div></header><div id="toast" class="toast" hidden></div><section id="calendarView"><div class="row"><p><b>1.</b> เลือกวันที่จากปฏิทิน &nbsp; <b>2.</b> กรอกรายละเอียดการจอง &nbsp; <b>3.</b> ส่งคำขอเพื่อรออนุมัติ</p></div><div class="stats"><div class="stat"><span>การจองทั้งหมด</span><b id="total">0</b><small>รายการในระบบ</small></div><div class="stat"><span>รออนุมัติ</span><b class="amber" id="pendingNo">0</b><small>ต้องตรวจสอบ</small></div><div class="stat"><span>อนุมัติแล้ว</span><b class="green" id="approvedNo">0</b><small>ในเดือนนี้</small></div><div class="stat"><span>ห้องประชุม</span><b style="font-size:16px;margin-top:14px">FA Meeting Room</b><small>พร้อมใช้งาน 1 ห้อง</small></div></div><div class="grid"><section class="card"><div class="head"><div><h2>ปฏิทินการจอง</h2><small>Meeting room availability</small></div><div class="month"><button id="prev">‹</button><b id="month"></b><button id="next">›</button></div></div><div class="cal"><div class="week"><span>อา</span><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span></div><div class="days" id="days"></div></div><div class="legend"><i></i> มีการจอง <i class="w"></i> รออนุมัติ</div></section><section class="card"><div class="head"><div><h2 id="dayTitle"></h2><small id="dayCount"></small></div></div><div class="list" id="bookings"></div></section></div></section><section id="adminView" hidden class="card"><div class="head"><div><h2>คำขอที่รอการตรวจสอบ</h2><small>ตรวจสอบรายละเอียดก่อนอนุมัติการจอง</small></div></div><div class="pending" id="pendingList"></div></section></main></div><div id="formWrap" class="overlay" hidden><form class="modal" id="form"><div class="modalhead"><div><span class="eyebrow">NEW REQUEST</span><h2>สร้างรายการจอง</h2></div><button type="button" class="close" id="close">×</button></div><label>วันที่จอง<input id="bookingDate" type="date" required></label><label>ชื่อเรื่อง<input id="topic" required placeholder="เช่น ประชุมปิดงบประจำเดือน"></label><div class="twocol"><label>เวลาเริ่ม<input id="start" type="time" value="09:00"></label><label>เวลาสิ้นสุด<input id="end" type="time" value="10:00"></label></div><label>ผู้จอง<input id="person" required placeholder="ชื่อ - นามสกุล"></label><label>ส่วนงาน<select id="dept"><option>บัญชี</option><option>การเงิน</option><option>เจ้าหนี้การค้า (AP)</option><option>ลูกหนี้การค้า (AR)</option><option>ควบคุมต้นทุน</option></select></label><div class="foot"><button type="button" class="reject" id="cancel">ยกเลิก</button><button class="primary" type="submit">ส่งคำขอจอง</button></div></form></div><script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { getFirestore, collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore, collection, query, where, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCSdz5oGaQ_IlamEzoWO9u086OKr5ACd2U",
@@ -60,8 +60,10 @@ function render(){
   $("#dayCount").textContent=selected.length?selected.length+" รายการจอง":"ยังไม่มีรายการจอง";
   $("#bookings").innerHTML=selected.length?selected.map(function(x){
     const style=x.status==="approved"?"ok":"waits";
-    return '<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+x.title+'</b><span>'+x.person+" · "+x.dept+'</span><em class="status '+style+'">'+statusLabel(x.status)+"</em></div></article>";
-  }).join(""):'<p style="text-align:center;color:#98a5b6;padding:80px 0;font-size:12px">ยังไม่มีรายการจอง<br><br>คลิกวันที่เพื่อสร้างคำขอจอง</p>';
+    const title=currentUser?x.title:"ไม่ว่าง";
+    const detail=currentUser?(x.person+" · "+x.dept):"FA Meeting Room";
+    return '<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+title+'</b><span>'+detail+'</span><em class="status '+style+'">'+statusLabel(x.status)+"</em></div></article>";
+  }).join(""):'<p style="text-align:center;color:#98a5b6;padding:80px 0;font-size:12px">ยังไม่มีรายการจอง<br><br>คลิกวันที่ที่ว่างเพื่อเข้าสู่ระบบและสร้างคำขอจอง</p>';
   $("#pendingList").innerHTML=pending.length?pending.map(function(x){
     return "<article class='request'><div class='rIcon'>▦</div><div class='rmain'><b>" + x.title + "</b><span>วันที่ " + th(new Date(x.date+"T00:00:00")) + " · เวลา " + x.time + "</span><small>ผู้จอง: " + x.person + " · " + x.dept + "</small></div><div class='actions'><button class='approve' data-ok='" + x.id + "'>✓ อนุมัติ</button><button class='reject' data-no='" + x.id + "'>ไม่อนุมัติ</button></div></article>";
   }).join(""):"<p style='text-align:center;color:#98a5b6;padding:50px'>ไม่มีคำขอรออนุมัติ</p>";
@@ -70,18 +72,45 @@ function render(){
 }
 function clearSubscriptions(){unsubs.forEach(fn=>fn());unsubs=[]}
 function subscribeBookings(){
-  clearSubscriptions();if(!currentUser){data=[];render();return}
-  const collected=new Map(),draw=()=>{data=[...collected.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));render()};
-  const listen=q=>unsubs.push(onSnapshot(q,snap=>{snap.docChanges().forEach(change=>{if(change.type==="removed")collected.delete(change.doc.id);else collected.set(change.doc.id,{id:change.doc.id,...change.doc.data()})});draw()},err=>notice("ยังเชื่อมฐานข้อมูลไม่ได้: "+err.message)));
-  if(isAdmin()) listen(collection(db,"bookings"));
-  else {listen(query(collection(db,"bookings"),where("status","==","approved")));listen(query(collection(db,"bookings"),where("requesterEmail","==",currentUser.email)));}
+  clearSubscriptions();
+  const collected=new Map(),draw=function(){data=[...collected.values()].sort(function(a,b){return a.date.localeCompare(b.date)||a.time.localeCompare(b.time)});render()};
+  const syncPublic=function(change){
+    if(change.type==="removed"){deleteDoc(doc(db,"publicBookings",change.doc.id)).catch(function(){});return}
+    const booking=change.doc.data();
+    if(booking.status==="approved"){
+      setDoc(doc(db,"publicBookings",change.doc.id),{date:booking.date,time:booking.time,status:"approved",title:"ไม่ว่าง"}).catch(function(){});
+    }else{
+      deleteDoc(doc(db,"publicBookings",change.doc.id)).catch(function(){});
+    }
+  };
+  const listen=function(source,adminSync){
+    unsubs.push(onSnapshot(source,function(snap){
+      snap.docChanges().forEach(function(change){
+        if(change.type==="removed")collected.delete(change.doc.id);
+        else collected.set(change.doc.id,Object.assign({id:change.doc.id},change.doc.data()));
+        if(adminSync)syncPublic(change);
+      });
+      draw();
+    },function(err){notice("ยังเชื่อมฐานข้อมูลไม่ได้: "+err.message)}));
+  };
+  if(!currentUser){listen(collection(db,"publicBookings"),false);return}
+  if(isAdmin())listen(collection(db,"bookings"),true);
+  else{
+    listen(query(collection(db,"bookings"),where("status","==","approved")),false);
+    listen(query(collection(db,"bookings"),where("requesterEmail","==",currentUser.email)),false);
+  }
 }
 async function login(){try{const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:"select_account"});await signInWithPopup(auth,provider)}catch(e){notice("Login ไม่สำเร็จ: "+e.message)}}
 async function decide(id,status){
   if(!isAdmin())return;
   let reason="";
   if(status==="rejected"){reason=prompt("ระบุเหตุผลที่ไม่อนุมัติ:","ช่วงเวลาดังกล่าวมีการจองซ้ำ กรุณาเลือกเวลาใหม่");if(reason===null)return}
-  try{await updateDoc(doc(db,"bookings",id),{status,decisionReason:reason,decidedBy:currentUser.email,decidedAt:serverTimestamp()});notice(status==="approved"?"อนุมัติและเพิ่มลงปฏิทินแล้ว":"ไม่อนุมัติและแจ้งเหตุผลแล้ว")}catch(e){notice("บันทึกสถานะไม่สำเร็จ: "+e.message)}
+  try{
+    await updateDoc(doc(db,"bookings",id),{status,decisionReason:reason,decidedBy:currentUser.email,decidedAt:serverTimestamp()});
+    if(status==="approved")await setDoc(doc(db,"publicBookings",id),{date:data.find(function(x){return x.id===id}).date,time:data.find(function(x){return x.id===id}).time,status:"approved",title:"ไม่ว่าง"});
+    else await deleteDoc(doc(db,"publicBookings",id));
+    notice(status==="approved"?"อนุมัติและเพิ่มลงปฏิทินแล้ว":"ไม่อนุมัติและแจ้งเหตุผลแล้ว");
+  }catch(e){notice("บันทึกสถานะไม่สำเร็จ: "+e.message)}
 }
 $("#prev").onclick=()=>{month=new Date(month.getFullYear(),month.getMonth()-1,1);render()};
 $("#next").onclick=()=>{month=new Date(month.getFullYear(),month.getMonth()+1,1);render()};
