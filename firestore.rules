@@ -8,6 +8,7 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn() && (
         request.auth.token.email == "fa@impact.co.th" ||
+        request.auth.token.email == "fagpt123@gmail.com" ||
         request.auth.token.email == "Naruemonc@impact.co.th" ||
         request.auth.token.email == "naruemonc@impact.co.th"
       );
