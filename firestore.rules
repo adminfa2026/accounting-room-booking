@@ -21,6 +21,10 @@ service cloud.firestore {
         get(/databases/$(database)/documents/bookings/$(bookingId)).data.requesterUid == request.auth.uid;
     }
 
+    match /profiles/{userId} {
+      allow get, create, update: if signedIn() && request.auth.uid == userId;
+    }
+
     match /publicBookings/{bookingId} {
       // This collection contains only availability, never names or meeting details.
       allow get, list: if true;
