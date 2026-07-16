@@ -25,6 +25,8 @@ function isAdmin(){return !!currentUser&&adminEmails.has((currentUser.email||"")
 function hideForm(){$("#formWrap").hidden=true}
 function openForm(date){if(!currentUser){notice("กรุณาเข้าสู่ระบบด้วย Google ก่อนจองห้องประชุม");return}chosen=date;$("#bookingDate").value=date;$("#formWrap").hidden=false}
 function statusLabel(status){return status==="approved"?"อนุมัติแล้ว":status==="rejected"?"ไม่อนุมัติ":"รออนุมัติ"}
+function toMinutes(value){const parts=value.split(":").map(Number);return parts[0]*60+parts[1]}
+function hasApprovedConflict(date,startTime,endTime){const start=toMinutes(startTime),end=toMinutes(endTime);return data.some(function(item){if(item.date!==date||item.status!=="approved")return false;const times=item.time.split(" - ");return start<toMinutes(times[1])&&end>toMinutes(times[0])})}
 function updateAuthBox(){
   const box=$("#authBox");
   if(!currentUser){box.innerHTML='<button id="loginBtn">เข้าสู่ระบบด้วย Google</button>';$("#loginBtn").onclick=login;$("#adminNav").style.display="none";return}
@@ -85,7 +87,19 @@ $("#prev").onclick=()=>{month=new Date(month.getFullYear(),month.getMonth()-1,1)
 $("#next").onclick=()=>{month=new Date(month.getFullYear(),month.getMonth()+1,1);render()};
 $("#close").onclick=hideForm;$("#cancel").onclick=hideForm;$("#formWrap").onclick=e=>{if(e.target===$("#formWrap"))hideForm()};
 $("#bookingDate").onchange=e=>{chosen=e.target.value};
-$("#form").onsubmit=async e=>{e.preventDefault();if(!currentUser)return notice("กรุณาเข้าสู่ระบบก่อน");const title=$("#topic").value.trim(),person=$("#person").value.trim(),date=$("#bookingDate").value;if(!title||!person||!date)return notice("กรุณากรอกวันที่ ชื่อเรื่อง และผู้จองให้ครบ");try{await addDoc(collection(db,"bookings"),{title,date,time:$("#start").value+" - "+$("#end").value,person,dept:$("#dept").value,status:"pending",requesterEmail:currentUser.email,requesterUid:currentUser.uid,createdAt:serverTimestamp()});e.target.reset();hideForm();chosen=date;render();notice("ส่งคำขอแล้ว — สถานะ: รออนุมัติ")}catch(err){notice("ส่งคำขอไม่สำเร็จ: "+err.message)}};
+$("#form").onsubmit=async e=>{
+  e.preventDefault();
+  if(!currentUser)return notice("กรุณาเข้าสู่ระบบก่อน");
+  const title=$("#topic").value.trim(),person=$("#person").value.trim(),date=$("#bookingDate").value;
+  const startTime=$("#start").value,endTime=$("#end").value;
+  if(!title||!person||!date)return notice("กรุณากรอกวันที่ ชื่อเรื่อง และผู้จองให้ครบ");
+  if(toMinutes(endTime)<=toMinutes(startTime))return notice("เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม");
+  if(hasApprovedConflict(date,startTime,endTime)){return notice("ช่วงเวลานี้มีการจอง FA Meeting Room และอนุมัติแล้ว กรุณาเลือกเวลาใหม่");}
+  try{
+    await addDoc(collection(db,"bookings"),{title,date,time:startTime+" - "+endTime,person,dept:$("#dept").value,status:"pending",requesterEmail:currentUser.email,requesterUid:currentUser.uid,createdAt:serverTimestamp()});
+    e.target.reset();hideForm();chosen=date;render();notice("ส่งคำขอแล้ว — สถานะ: รออนุมัติ");
+  }catch(err){notice("ส่งคำขอไม่สำเร็จ: "+err.message)}
+};
 $("#adminNav").onclick=()=>{if(!isAdmin())return;$("#calendarView").hidden=true;$("#adminView").hidden=false;$("#title").textContent="รายการรออนุมัติ";$("#adminNav").classList.add("active");$("#calNav").classList.remove("active");render()};
 $("#calNav").onclick=()=>{$("#calendarView").hidden=false;$("#adminView").hidden=true;$("#title").textContent="ปฏิทินห้องประชุม";$("#calNav").classList.add("active");$("#adminNav").classList.remove("active")};
 onAuthStateChanged(auth,user=>{currentUser=user;updateAuthBox();subscribeBookings()});updateAuthBox();render();
