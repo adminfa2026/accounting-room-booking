@@ -16,7 +16,7 @@ const firebaseConfig = {
 };
 const app=initializeApp(firebaseConfig);
 const auth=getAuth(app), db=getFirestore(app);
-const adminEmails=new Set(["fa@impact.co.th","naruemonc@impact.co.th"]);
+const adminEmails=new Set(["fa@impact.co.th","naruemonc@impact.co.th","fagpt123@gmail.com"]);
 const $=x=>document.querySelector(x),pad=x=>String(x).padStart(2,"0"),key=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()),th=d=>d.toLocaleDateString("th-TH",{day:"numeric",month:"long"});
 let month=new Date(),chosen=key(new Date()),data=[],currentUser=null,unsubs=[];
 
