@@ -66,7 +66,7 @@ function render(){
     const detail=currentUser?(x.person+" · "+x.dept):"FA Meeting Room";
     const canManage=currentUser&&(isAdmin()||x.requesterEmail===currentUser.email);
     const controls=canManage?'<div class="actions" style="margin-left:auto;align-self:center">'+((isAdmin()||x.status==="pending")?'<button class="approve" data-edit="'+x.id+'">แก้ไข</button>':"")+'<button class="reject" data-cancel-booking="'+x.id+'">ยกเลิก</button></div>':"";
-    return '<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+title+'</b><span>'+detail+'</span><em class="status '+style+'">'+statusLabel(x.status)+"</em></div>'+controls+'</article>';
+    return '<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+title+'</b><span>'+detail+'</span><em class="status '+style+'">'+statusLabel(x.status)+'</em></div>'+controls+'</article>';
   }).join(""):'<p style="text-align:center;color:#98a5b6;padding:80px 0;font-size:12px">ยังไม่มีรายการจอง<br><br>คลิกวันที่ที่ว่างเพื่อเข้าสู่ระบบและสร้างคำขอจอง</p>';
   $("#pendingList").innerHTML=pending.length?pending.map(function(x){
     return "<article class='request'><div class='rIcon'>▦</div><div class='rmain'><b>" + x.title + "</b><span>วันที่ " + th(new Date(x.date+"T00:00:00")) + " · เวลา " + x.time + "</span><small>ผู้จอง: " + x.person + " · " + x.dept + "</small></div><div class='actions'><button class='approve' data-ok='" + x.id + "'>✓ อนุมัติ</button><button class='reject' data-no='" + x.id + "'>ไม่อนุมัติ</button></div></article>";
