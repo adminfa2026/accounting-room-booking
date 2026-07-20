@@ -148,7 +148,18 @@ async function cancelBooking(id){
 }
 async function decide(id,status){
   if(!isAdmin())return;
+  const booking=data.find(function(item){return item.id===id});
+  if(!booking)return;
   let reason="";
+  if(status==="approved"){
+    const times=booking.time.split(" - "),start=toMinutes(times[0]),end=toMinutes(times[1]);
+    const conflict=data.find(function(item){
+      if(item.id===id||item.status!=="approved"||item.date!==booking.date)return false;
+      const itemTimes=item.time.split(" - ");
+      return start<toMinutes(itemTimes[1])&&end>toMinutes(itemTimes[0]);
+    });
+    if(conflict)return notice("อนุมัติไม่ได้: "+conflict.time+" มีรายการอนุมัติแล้ว กรุณาไม่อนุมัติคำขอนี้",true);
+  }
   if(status==="rejected"){reason=prompt("ระบุเหตุผลที่ไม่อนุมัติ:","ช่วงเวลาดังกล่าวมีการจองซ้ำ กรุณาเลือกเวลาใหม่");if(reason===null)return}
   try{
     await updateDoc(doc(db,"bookings",id),{status,decisionReason:reason,decidedBy:currentUser.email,decidedAt:serverTimestamp()});
