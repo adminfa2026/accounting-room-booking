@@ -8,35 +8,26 @@ service cloud.firestore {
 
     function isAdmin() {
       return signedIn() && (
-        request.auth.token.email == "fa@impact.co.th" ||
-        request.auth.token.email == "fagpt123@gmail.com" ||
-        request.auth.token.email == "Naruemonc@impact.co.th" ||
-        request.auth.token.email == "naruemonc@impact.co.th"
+        request.auth.token.email == "admin07029@fa-meeting-room.firebaseapp.com" ||
+        request.auth.token.email == "admin09267@fa-meeting-room.firebaseapp.com"
       );
     }
 
     function isBookingOwner(bookingId) {
       return signedIn() &&
-        get(/databases/$(database)/documents/bookings/$(bookingId)).data.requesterEmail == request.auth.token.email &&
         get(/databases/$(database)/documents/bookings/$(bookingId)).data.requesterUid == request.auth.uid;
     }
 
     match /employees/{employeeCode} {
-      // Login can look up one employee code; directory listing is not permitted.
+      // Allows a single code lookup for employee-code login; directory listing is denied.
       allow get: if signedIn();
       allow list: if false;
       allow create, update, delete: if isAdmin();
     }
 
-    match /profiles/{userId} {
-      allow get, create, update: if signedIn() && request.auth.uid == userId;
-    }
-
     match /publicBookings/{bookingId} {
-      // This collection contains only availability, never names or meeting details.
       allow get, list: if true;
       allow create, update: if isAdmin();
-      // The requester must remove availability first, then remove their booking.
       allow delete: if isAdmin() || isBookingOwner(bookingId);
     }
 
@@ -44,30 +35,24 @@ service cloud.firestore {
       allow get, list: if isAdmin() || (
         signedIn() && (
           resource.data.status == "approved" ||
-          resource.data.requesterEmail == request.auth.token.email
+          resource.data.requesterUid == request.auth.uid
         )
       );
 
       allow create: if signedIn() &&
         request.resource.data.status == "pending" &&
-        request.resource.data.requesterEmail == request.auth.token.email &&
         request.resource.data.requesterUid == request.auth.uid;
 
-      // The requester may edit only a request that is still pending.
       allow update: if isAdmin() || (
         signedIn() &&
         resource.data.status == "pending" &&
-        resource.data.requesterEmail == request.auth.token.email &&
         resource.data.requesterUid == request.auth.uid &&
         request.resource.data.status == "pending" &&
-        request.resource.data.requesterEmail == resource.data.requesterEmail &&
         request.resource.data.requesterUid == resource.data.requesterUid
       );
 
-      // The requester can cancel their own booking; Admin can cancel any booking.
       allow delete: if isAdmin() || (
         signedIn() &&
-        resource.data.requesterEmail == request.auth.token.email &&
         resource.data.requesterUid == request.auth.uid
       );
     }
