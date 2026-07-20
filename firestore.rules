@@ -21,6 +21,13 @@ service cloud.firestore {
         get(/databases/$(database)/documents/bookings/$(bookingId)).data.requesterUid == request.auth.uid;
     }
 
+    match /employees/{employeeCode} {
+      // Login can look up one employee code; directory listing is not permitted.
+      allow get: if signedIn();
+      allow list: if false;
+      allow create, update, delete: if isAdmin();
+    }
+
     match /profiles/{userId} {
       allow get, create, update: if signedIn() && request.auth.uid == userId;
     }
