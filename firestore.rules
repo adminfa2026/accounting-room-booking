@@ -21,7 +21,7 @@ service cloud.firestore {
     match /employees/{employeeCode} {
       // Allows a single code lookup for employee-code login; directory listing is denied.
       allow get: if signedIn();
-      allow list: if false;
+      allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
