@@ -27,7 +27,7 @@ function rememberEmployee(employee){currentEmployee=employee;sessionStorage.setI
 function resetForm(){editingId=null;$("#form").reset();$("#formTitle").textContent="สร้างรายการจอง";$("#formSubmit").textContent="ส่งคำขอจอง"}
 function fillRequesterProfile(){$("#person").value=currentEmployee?.name||"";$("#phone").value=currentEmployee?.phone||"";$("#dept").value=currentEmployee?.department||"Accounting"}
 function hideForm(){$("#formWrap").hidden=true;resetForm()}
-function openLogin(){$("#loginWrap").hidden=false;$("#employeeCode").focus()}
+function openLogin(){$("#loginWrap").hidden=false;$("#employeeCode").value="";$("#adminPassword").value="";$("#employeeCode").focus()}
 function hideLogin(){$("#loginWrap").hidden=true;$("#loginForm").reset()}
 function openForm(date){if(!currentEmployee){openLogin();notice("กรุณากรอกรหัสพนักงานก่อนจองห้องประชุม");return}resetForm();fillRequesterProfile();chosen=date;$("#bookingDate").value=date;$("#formWrap").hidden=false}
 function openEdit(id){const item=data.find(function(x){return x.id===id});if(!item||!currentEmployee)return;editingId=id;chosen=item.date;const times=item.time.split(" - ");$("#bookingDate").value=item.date;$("#topic").value=item.title;$("#start").value=times[0];$("#end").value=times[1];$("#person").value=item.person;$("#phone").value=item.phone||"";$("#dept").value=item.dept;$("#formTitle").textContent="แก้ไขรายการจอง";$("#formSubmit").textContent="บันทึกการแก้ไข";$("#formWrap").hidden=false}
@@ -167,6 +167,7 @@ function subscribeBookings(){
 }
 async function loginByEmployeeCode(code,password){
   try{
+    if(!/^\\d{1,5}$/.test(String(code).trim()))return notice("กรุณากรอกรหัสพนักงานเป็นตัวเลขเท่านั้น",true);
     if(!auth.currentUser)await signInAnonymously(auth);
     const normalized=String(code).trim().padStart(5,"0");
     const snap=await getDoc(doc(db,"employees",normalized));
@@ -251,6 +252,7 @@ $("#syncPublic").onclick=syncPublicCalendar;
 $("#migrateLegacy").onclick=migrateLegacyHistory;
 $("#closeLogin").onclick=hideLogin;$("#cancelLogin").onclick=hideLogin;$("#loginWrap").onclick=e=>{if(e.target===$("#loginWrap"))hideLogin()};
 $("#loginForm").onsubmit=async e=>{e.preventDefault();await loginByEmployeeCode($("#employeeCode").value,$("#adminPassword").value)};
+$("#employeeCode").oninput=e=>{e.target.value=e.target.value.replace(/\\D/g,"").slice(0,5)};
 
 onAuthStateChanged(auth,user=>{currentUser=user;if(user&&!currentEmployee){const saved=storedEmployee();if(saved)currentEmployee=saved}updateAuthBox();subscribeBookings();subscribeHistory()});updateAuthBox();subscribeBookings();subscribeHistory();render();
 </script></body></html>
