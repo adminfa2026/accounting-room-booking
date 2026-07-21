@@ -167,7 +167,7 @@ function subscribeBookings(){
 }
 async function loginByEmployeeCode(code,password){
   try{
-    if(!/^\\d{1,5}$/.test(String(code).trim()))return notice("กรุณากรอกรหัสพนักงานเป็นตัวเลขเท่านั้น",true);
+    if(!/^\d{1,5}$/.test(String(code).trim()))return notice("กรุณากรอกรหัสพนักงานเป็นตัวเลขเท่านั้น",true);
     if(!auth.currentUser)await signInAnonymously(auth);
     const normalized=String(code).trim().padStart(5,"0");
     const snap=await getDoc(doc(db,"employees",normalized));
