@@ -124,12 +124,12 @@ async function migrateLegacyHistory(){
     const normalize=value=>String(value||"").replace(/\s+/g,"").trim();
     const staffSnap=await getDocs(collection(db,"employees"));
     const staff=new Map(staffSnap.docs.map(function(item){const person=item.data();return [normalize(person.name),person.code]}));
-    const legacy=data.filter(function(item){return !item.requesterCode});
+    const bookingsToMigrate=data;
     let migrated=0,unmatched=0;
-    for(const booking of legacy){
-      const code=staff.get(normalize(booking.person));
+    for(const booking of bookingsToMigrate){
+      const code=booking.requesterCode||staff.get(normalize(booking.person));
       if(!code){unmatched++;continue}
-      await updateDoc(doc(db,"bookings",booking.id),{requesterCode:code});
+      if(booking.requesterCode!==code)await updateDoc(doc(db,"bookings",booking.id),{requesterCode:code});
       await writeHistory(booking.id,Object.assign({},booking,{requesterCode:code}));
       migrated++;
     }
