@@ -25,6 +25,15 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /bookingHistory/{bookingId} {
+      // Explicitly approved: employee-code sessions can view history by employee code.
+      allow get, list: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin() || (
+        signedIn() && resource.data.requesterUid == request.auth.uid
+      );
+    }
+
     match /publicBookings/{bookingId} {
       allow get, list: if true;
       allow create, update: if isAdmin();
