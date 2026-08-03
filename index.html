@@ -164,15 +164,15 @@ function subscribeBookings(){
       draw();
     },function(err){notice("ยังเชื่อมฐานข้อมูลไม่ได้: "+err.message)}));
   };
-  if(!currentEmployee||!currentUser){listen(collection(db,"publicBookings"),false);return}
-  if(isAdmin())listen(collection(db,"bookings"),true);
-  else{
-    listen(query(collection(db,"bookings"),where("status","==","approved")),false);
-    // requesterUid is device-specific for anonymous Firebase sessions.  requesterCode
-    // is the employee identity, so it keeps the same employee's desktop and mobile
-    // bookings together.
-    listen(query(collection(db,"bookings"),where("requesterCode","==",currentEmployee.code)),false);
+  // Everyone except admins reads the privacy-safe shared calendar. This keeps
+  // pending/approved dots identical across phones and computers without asking
+  // Firestore for the protected full booking records.
+  if(!currentEmployee||!currentUser||!isAdmin()){
+    listen(collection(db,"publicBookings"),false);
+    return;
   }
+  // Admins need the full records for approval and management actions.
+  listen(collection(db,"bookings"),true);
 }
 async function loginByEmployeeCode(code,password){
   try{
