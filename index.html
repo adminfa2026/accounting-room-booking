@@ -109,14 +109,20 @@ function clearSubscriptions(){unsubs.forEach(fn=>fn());unsubs=[]}
 function subscribeHistory(){
   if(historyUnsub){historyUnsub();historyUnsub=null}
   if(!currentEmployee||!currentUser){historyData=[];render();return}
-  historyUnsub=onSnapshot(query(collection(db,"bookingHistory"),where("requesterCode","==",currentEmployee.code)),function(snap){
+  // Employee history is stored under that employee's code.  Do not query the
+  // admin-only bookingHistory collection here: that was the source of the
+  // "Missing or insufficient permissions" message on phones and desktops.
+  historyUnsub=onSnapshot(collection(db,"employeeHistory",currentEmployee.code,"entries"),function(snap){
     historyData=snap.docs.map(function(item){return Object.assign({id:item.id},item.data())}).sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""))});
     render();
   },function(err){notice("ยังดึงประวัติไม่ได้: "+err.message,true)});
 }
 async function writeHistory(id,booking,extra={}){
   const record=Object.assign({requesterCode:booking.requesterCode||currentEmployee?.code||"",requesterUid:booking.requesterUid||currentUser?.uid||"",title:booking.title,date:booking.date,time:booking.time,person:booking.person,phone:booking.phone||"",dept:booking.dept,status:booking.status,decisionReason:booking.decisionReason||"",decidedBy:booking.decidedBy||"",createdAt:booking.createdAt||serverTimestamp(),decidedAt:booking.decidedAt||null},extra);
+  // Keep the full administrative history and the employee's own history in
+  // separate paths.  The latter is what the employee screen reads.
   await setDoc(doc(db,"bookingHistory",id),record,{merge:true});
+  await setDoc(doc(db,"employeeHistory",record.requesterCode,"entries",id),record,{merge:true});
 }
 async function migrateLegacyHistory(){
   if(!isAdmin())return;
