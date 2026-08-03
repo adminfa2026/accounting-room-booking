@@ -162,7 +162,10 @@ function subscribeBookings(){
   if(isAdmin())listen(collection(db,"bookings"),true);
   else{
     listen(query(collection(db,"bookings"),where("status","==","approved")),false);
-    listen(query(collection(db,"bookings"),where("requesterUid","==",currentUser.uid)),false);
+    // requesterUid is device-specific for anonymous Firebase sessions.  requesterCode
+    // is the employee identity, so it keeps the same employee's desktop and mobile
+    // bookings together.
+    listen(query(collection(db,"bookings"),where("requesterCode","==",currentEmployee.code)),false);
   }
 }
 async function loginByEmployeeCode(code,password){
@@ -170,6 +173,9 @@ async function loginByEmployeeCode(code,password){
     // ตรวจรหัสพนักงานเป็นตัวเลข 1–5 หลัก (เช่น 07029)
     if(!/^\d{1,5}$/.test(String(code).trim()))return notice("กรุณากรอกรหัสพนักงานเป็นตัวเลขเท่านั้น",true);
     if(!auth.currentUser)await signInAnonymously(auth);
+    // Firebase updates auth.currentUser before the auth-state callback is scheduled.
+    // Keep the local variable in sync so a mobile user can submit immediately after login.
+    currentUser=auth.currentUser;
     const normalized=String(code).trim().padStart(5,"0");
     const snap=await getDoc(doc(db,"employees",normalized));
     if(!snap.exists())return notice("ไม่พบรหัสพนักงานนี้",true);
@@ -178,6 +184,7 @@ async function loginByEmployeeCode(code,password){
       if(!password)return notice("กรุณากรอกรหัสผ่านสำหรับแอดมิน",true);
       await signOut(auth);
       await signInWithEmailAndPassword(auth,adminLoginEmails[employee.code],password);
+      currentUser=auth.currentUser;
     }
     rememberEmployee(employee);
     hideLogin();updateAuthBox();subscribeBookings();subscribeHistory();notice("เข้าสู่ระบบแล้ว — "+employee.name);
