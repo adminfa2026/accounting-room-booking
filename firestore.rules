@@ -26,12 +26,18 @@ service cloud.firestore {
     }
 
     match /bookingHistory/{bookingId} {
-      // Explicitly approved: employee-code sessions can view history by employee code.
-      allow get, list: if signedIn();
+      // Full history is reserved for admins. Employees read only their separate,
+      // employee-code history path below.
+      allow get, list: if isAdmin();
       allow create: if signedIn();
-      allow update, delete: if isAdmin() || (
-        signedIn() && resource.data.requesterUid == request.auth.uid
-      );
+      allow update, delete: if isAdmin();
+    }
+
+    match /employeeHistory/{employeeCode}/entries/{bookingId} {
+      // The user expressly accepted employee-code-only history access. Keeping
+      // entries beneath the requested code prevents browsing the whole history.
+      allow get, list, create: if signedIn();
+      allow update, delete: if isAdmin();
     }
 
     match /publicBookings/{bookingId} {
@@ -41,11 +47,10 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
+      // Employees only see approved bookings in the calendar; their own complete
+      // status history is read from employeeHistory/{employeeCode}/entries.
       allow get, list: if isAdmin() || (
-        signedIn() && (
-          resource.data.status == "approved" ||
-          resource.data.requesterUid == request.auth.uid
-        )
+        signedIn() && resource.data.status == "approved"
       );
 
       allow create: if signedIn() &&
