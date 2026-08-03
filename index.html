@@ -100,9 +100,9 @@ function render(){
 async function syncPublicCalendar(){
   if(!isAdmin())return;
   try{
-    const approved=data.filter(function(item){return item.status==="approved"});
-    await Promise.all(approved.map(function(item){return setDoc(doc(db,"publicBookings",item.id),{date:item.date,time:item.time,status:"approved",title:"ไม่ว่าง"})}));
-    notice("ซิงก์รายการอนุมัติแล้ว "+approved.length+" รายการไปยังหน้าแรกแล้ว");
+    const active=data.filter(function(item){return item.status!=="rejected"});
+    await Promise.all(active.map(function(item){return setDoc(doc(db,"publicBookings",item.id),{date:item.date,time:item.time,status:item.status,title:"ไม่ว่าง"})}));
+    notice("ซิงก์รายการบนปฏิทินแล้ว "+active.length+" รายการ");
   }catch(err){notice("ซิงก์ไม่สำเร็จ: "+err.message)}
 }
 function clearSubscriptions(){unsubs.forEach(fn=>fn());unsubs=[]}
@@ -148,8 +148,8 @@ function subscribeBookings(){
   const syncPublic=function(change){
     if(change.type==="removed"){deleteDoc(doc(db,"publicBookings",change.doc.id)).catch(function(){});return}
     const booking=change.doc.data();
-    if(booking.status==="approved"){
-      setDoc(doc(db,"publicBookings",change.doc.id),{date:booking.date,time:booking.time,status:"approved",title:"ไม่ว่าง"}).catch(function(){});
+    if(booking.status!=="rejected"){
+      setDoc(doc(db,"publicBookings",change.doc.id),{date:booking.date,time:booking.time,status:booking.status,title:"ไม่ว่าง"}).catch(function(){});
     }else{
       deleteDoc(doc(db,"publicBookings",change.doc.id)).catch(function(){});
     }
@@ -252,6 +252,7 @@ $("#form").onsubmit=async e=>{
       hideForm();chosen=date;render();notice("บันทึกการแก้ไขแล้ว");
     }else{
       const bookingRef=await addDoc(collection(db,"bookings"),{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value,status:"pending",requesterEmail:currentUser.email||"",requesterCode:currentEmployee.code,requesterUid:currentUser.uid,createdAt:serverTimestamp()});
+      await setDoc(doc(db,"publicBookings",bookingRef.id),{date,time:startTime+" - "+endTime,status:"pending",title:"ไม่ว่าง"});
       await writeHistory(bookingRef.id,{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value,status:"pending",requesterCode:currentEmployee.code,requesterUid:currentUser.uid,createdAt:serverTimestamp()});
       hideForm();chosen=date;render();notice("ส่งคำขอแล้ว — สถานะ: รออนุมัติ");
     }
