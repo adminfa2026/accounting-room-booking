@@ -24,11 +24,28 @@ function notice(message,prominent=false){const n=$("#toast");n.classList.toggle(
 function isAdmin(){return !!currentUser&&!currentUser.isAnonymous&&currentEmployee?.role==="Admin"&&adminLoginEmails[currentEmployee.code]===currentUser.email}
 function storedEmployee(){try{return JSON.parse(sessionStorage.getItem("faMeetingEmployee")||"null")}catch(e){return null}}
 function rememberEmployee(employee){currentEmployee=employee;sessionStorage.setItem("faMeetingEmployee",JSON.stringify(employee))}
+function ensureGuestLoginFields(){
+  if($("#guestFields"))return;
+  const wrap=document.createElement("div");
+  wrap.id="guestFields";
+  wrap.hidden=true;
+  wrap.innerHTML='<label>ชื่อผู้ใช้งานภายนอก<input id="guestName" autocomplete="name" maxlength="100" placeholder="ชื่อ - นามสกุล"></label><label>เบอร์โทรศัพท์<input id="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="เช่น 081-234-5678"></label>';
+  $("#adminPassword").parentElement.before(wrap);
+}
+function toggleGuestLoginFields(){
+  ensureGuestLoginFields();
+  const guest=String($("#employeeCode").value).trim()==="00000";
+  $("#guestFields").hidden=!guest;
+  $("#guestName").required=guest;
+  $("#guestPhone").required=guest;
+  $("#adminPassword").parentElement.hidden=guest;
+  if(!guest){$("#guestName").value="";$("#guestPhone").value=""}
+}
 function resetForm(){editingId=null;$("#form").reset();$("#formTitle").textContent="สร้างรายการจอง";$("#formSubmit").textContent="ส่งคำขอจอง"}
 function fillRequesterProfile(){$("#person").value=currentEmployee?.name||"";$("#phone").value=currentEmployee?.phone||"";$("#dept").value=currentEmployee?.department||"Accounting"}
 function hideForm(){$("#formWrap").hidden=true;resetForm()}
-function openLogin(){$("#loginWrap").hidden=false;$("#employeeCode").value="";$("#adminPassword").value="";$("#employeeCode").focus()}
-function hideLogin(){$("#loginWrap").hidden=true;$("#loginForm").reset()}
+function openLogin(){ensureGuestLoginFields();$("#loginWrap").hidden=false;$("#employeeCode").value="";$("#adminPassword").value="";toggleGuestLoginFields();$("#employeeCode").focus()}
+function hideLogin(){$("#loginWrap").hidden=true;$("#loginForm").reset();toggleGuestLoginFields()}
 function openForm(date){if(!currentEmployee){openLogin();notice("กรุณากรอกรหัสพนักงานก่อนจองห้องประชุม");return}resetForm();fillRequesterProfile();chosen=date;$("#bookingDate").value=date;$("#formWrap").hidden=false}
 function openEdit(id){const item=data.find(function(x){return x.id===id});if(!item||!currentEmployee)return;editingId=id;chosen=item.date;const times=item.time.split(" - ");$("#bookingDate").value=item.date;$("#topic").value=item.title;$("#start").value=times[0];$("#end").value=times[1];$("#person").value=item.person;$("#phone").value=item.phone||"";$("#dept").value=item.dept;$("#formTitle").textContent="แก้ไขรายการจอง";$("#formSubmit").textContent="บันทึกการแก้ไข";$("#formWrap").hidden=false}
 function statusLabel(status){return status==="approved"?"อนุมัติแล้ว":status==="rejected"?"ไม่อนุมัติ":"รออนุมัติ"}
@@ -84,7 +101,7 @@ function render(){
     return '<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+title+'</b><span>'+detail+'</span><em class="status '+style+'">'+statusLabel(x.status)+'</em></div>'+controls+'</article>';
   }).join(""):'<p style="text-align:center;color:#98a5b6;padding:80px 0;font-size:12px">ยังไม่มีรายการจอง<br><br>คลิกวันที่ที่ว่างเพื่อเข้าสู่ระบบและสร้างคำขอจอง</p>';
   $("#pendingList").innerHTML=pending.length?pending.map(function(x){
-    return "<article class='request'><div class='rIcon'>▦</div><div class='rmain'><b>" + x.title + "</b><span>วันที่ " + th(new Date(x.date+"T00:00:00")) + " · เวลา " + x.time + "</span><small>ผู้จอง: " + x.person + " · " + x.dept + "</small></div><div class='actions'><button class='approve' data-ok='" + x.id + "'>✓ อนุมัติ</button><button class='reject' data-no='" + x.id + "'>ไม่อนุมัติ</button></div></article>";
+    return "<article class='request'><div class='rIcon'>▦</div><div class='rmain'><b>" + x.title + "</b><span>วันที่ " + th(new Date(x.date+"T00:00:00")) + " · เวลา " + x.time + "</span><small>ผู้จอง: " + x.person + " · " + x.dept + " · โทร " + (x.phone||"-") + "</small></div><div class='actions'><button class='approve' data-ok='" + x.id + "'>✓ อนุมัติ</button><button class='reject' data-no='" + x.id + "'>ไม่อนุมัติ</button></div></article>";
   }).join(""):"<p style='text-align:center;color:#98a5b6;padding:50px'>ไม่มีคำขอรออนุมัติ</p>";
   document.querySelectorAll("[data-ok]").forEach(function(button){button.onclick=function(){decide(button.dataset.ok,"approved")}});
   document.querySelectorAll("[data-no]").forEach(function(button){button.onclick=function(){decide(button.dataset.no,"rejected")}});
@@ -174,7 +191,7 @@ function subscribeBookings(){
   // Admins need the full records for approval and management actions.
   listen(collection(db,"bookings"),true);
 }
-async function loginByEmployeeCode(code,password){
+async function loginByEmployeeCode(code,password,guestName="",guestPhone=""){
   try{
     // ตรวจรหัสพนักงานเป็นตัวเลข 1–5 หลัก (เช่น 07029)
     if(!/^\d{1,5}$/.test(String(code).trim()))return notice("กรุณากรอกรหัสพนักงานเป็นตัวเลขเท่านั้น",true);
@@ -183,6 +200,15 @@ async function loginByEmployeeCode(code,password){
     // Keep the local variable in sync so a mobile user can submit immediately after login.
     currentUser=auth.currentUser;
     const normalized=String(code).trim().padStart(5,"0");
+    if(normalized==="00000"){
+      const name=String(guestName).trim(),phone=String(guestPhone).trim();
+      if(!name)return notice("กรุณากรอกชื่อผู้ใช้งานภายนอก",true);
+      if(!/^[0-9+()\-\s]{8,20}$/.test(phone))return notice("กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง",true);
+      const guest={code:"00000",name,phone,department:"Other",role:"Guest"};
+      rememberEmployee(guest);
+      hideLogin();updateAuthBox();subscribeBookings();subscribeHistory();notice("เข้าสู่ระบบแล้ว — "+name);
+      return;
+    }
     const snap=await getDoc(doc(db,"employees",normalized));
     if(!snap.exists())return notice("ไม่พบรหัสพนักงานนี้",true);
     const employee=snap.data();
@@ -266,8 +292,8 @@ $("#adminHistoryNav").onclick=()=>{if(!isAdmin())return;$("#calendarView").hidde
 $("#syncPublic").onclick=syncPublicCalendar;
 $("#migrateLegacy").onclick=migrateLegacyHistory;
 $("#closeLogin").onclick=hideLogin;$("#cancelLogin").onclick=hideLogin;$("#loginWrap").onclick=e=>{if(e.target===$("#loginWrap"))hideLogin()};
-$("#loginForm").onsubmit=async e=>{e.preventDefault();await loginByEmployeeCode($("#employeeCode").value,$("#adminPassword").value)};
-$("#employeeCode").oninput=e=>{e.target.value=e.target.value.replace(/\D/g,"").slice(0,5)};
+$("#loginForm").onsubmit=async e=>{e.preventDefault();await loginByEmployeeCode($("#employeeCode").value,$("#adminPassword").value,$("#guestName")?.value,$("#guestPhone")?.value)};
+$("#employeeCode").oninput=e=>{e.target.value=e.target.value.replace(/\D/g,"").slice(0,5);toggleGuestLoginFields()};
 
 onAuthStateChanged(auth,user=>{currentUser=user;if(user&&!currentEmployee){const saved=storedEmployee();if(saved)currentEmployee=saved}updateAuthBox();subscribeBookings();subscribeHistory()});updateAuthBox();subscribeBookings();subscribeHistory();render();
 </script></body></html>
