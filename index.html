@@ -48,14 +48,15 @@ function openLogin(){ensureGuestLoginFields();$("#loginWrap").hidden=false;$("#e
 function hideLogin(){$("#loginWrap").hidden=true;$("#loginForm").reset();toggleGuestLoginFields()}
 function openForm(date){if(!currentEmployee){openLogin();notice("กรุณากรอกรหัสพนักงานก่อนจองห้องประชุม");return}resetForm();fillRequesterProfile();chosen=date;$("#bookingDate").value=date;$("#formWrap").hidden=false}
 function openEdit(id){const item=data.find(function(x){return x.id===id});if(!item||!currentEmployee)return;editingId=id;chosen=item.date;const times=item.time.split(" - ");$("#bookingDate").value=item.date;$("#topic").value=item.title;$("#start").value=times[0];$("#end").value=times[1];$("#person").value=item.person;$("#phone").value=item.phone||"";$("#dept").value=item.dept;$("#formTitle").textContent="แก้ไขรายการจอง";$("#formSubmit").textContent="บันทึกการแก้ไข";$("#formWrap").hidden=false}
-function statusLabel(status){return status==="approved"?"อนุมัติแล้ว":status==="rejected"?"ไม่อนุมัติ":"รออนุมัติ"}
+function statusLabel(status){return status==="approved"?"อนุมัติแล้ว":status==="rejected"?"ไม่อนุมัติ":status==="cancelled"?"ยกเลิกแล้ว":"รออนุมัติ"}
 function formatStamp(value,withSeconds=false,withMilliseconds=false){if(!value)return "กำลังบันทึกเวลา…";const date=value.toDate?value.toDate():new Date(value.seconds?value.seconds*1000:value);if(isNaN(date))return "-";const stamp=date.toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:withSeconds?"2-digit":undefined});return withMilliseconds&&withSeconds?stamp+"."+String(date.getMilliseconds()).padStart(3,"0"):stamp}
 function createdAtMillis(value){if(!value)return Number.MAX_SAFE_INTEGER;if(typeof value.toMillis==="function")return value.toMillis();if(value.seconds)return value.seconds*1000+(value.nanoseconds||0)/1000000;const millis=new Date(value).getTime();return isNaN(millis)?Number.MAX_SAFE_INTEGER:millis}
-function historyEntry(x,includeDecision){
-  const style=x.status==="approved"?"ok":x.status==="rejected"?"no":"waits";
+function historyEntry(x){
+  const style=x.status==="approved"?"ok":x.status==="rejected"||x.status==="cancelled"?"no":"waits";
   const reason=x.status==="rejected"&&x.decisionReason?'<span style="color:#c65851">เหตุผล: '+x.decisionReason+"</span>":"";
-  const decision=includeDecision?'<small>วันที่พิจารณา: '+formatStamp(x.decidedAt)+(x.decidedBy?" · "+x.decidedBy:"")+"</small>":"";
-  return '<article class="historyEntry"><div><b>'+x.title+'</b><span>วันที่จอง: '+x.date+" · "+x.time+"</span>"+reason+'<em class="status '+style+'" style="position:static;display:inline-block;margin-top:8px">'+statusLabel(x.status)+'</em></div><div class="historyMeta"><strong>ข้อมูลการจอง</strong><small>ผู้จอง: '+(x.person||"-")+"</small><small>ส่วนงาน: "+(x.dept||"-")+"</small><small>โทร: "+(x.phone||"-")+"</small><small>วันที่ทำรายการ: "+formatStamp(x.createdAt)+"</small>"+decision+"</div></article>";
+  const events=[['ส่งคำขอ',x.createdAt],['แก้ไขคำขอ',x.updatedAt],[(x.status==="approved"?"แอดมินอนุมัติ":x.status==="rejected"?"แอดมินไม่อนุมัติ":""),x.decidedAt],[(x.status==="cancelled"?"ยกเลิกคำขอ":""),x.cancelledAt]].filter(function(event){return event[0]&&event[1]});
+  const timeline=events.map(function(event){return '<small>◷ <b>'+event[0]+':</b> '+formatStamp(event[1],true,true)+'</small>'}).join("");
+  return '<article class="historyEntry"><div><b>'+x.title+'</b><span>วันที่จอง: '+x.date+" · "+x.time+"</span>"+reason+'<em class="status '+style+'" style="position:static;display:inline-block;margin-top:8px">'+statusLabel(x.status)+'</em></div><div class="historyMeta"><strong>Timeline คำขอ</strong>'+timeline+'</div></article>';
 }
 function toMinutes(value){const parts=value.split(":").map(Number);return parts[0]*60+parts[1]}
 function hasApprovedConflict(date,startTime,endTime){const start=toMinutes(startTime),end=toMinutes(endTime);return data.some(function(item){if(item.id===editingId||item.date!==date||item.status!=="approved")return false;const times=item.time.split(" - ");return start<toMinutes(times[1])&&end>toMinutes(times[0])})}
@@ -82,7 +83,7 @@ function render(){
     const d=new Date(start);d.setDate(start.getDate()+i);
     const date=key(d),items=data.filter(function(x){return x.date===date});
     const classes=(d.getMonth()!==month.getMonth()?"mute ":"")+(date===chosen?"sel":"");
-    const activeItems=items.filter(function(x){return x.status!=="rejected"});
+    const activeItems=items.filter(function(x){return x.status!=="rejected"&&x.status!=="cancelled"});
     const dot=activeItems.length?'<i class="dot '+(activeItems.some(function(x){return x.status==="pending"})?"wait":"")+'"></i>':"";
     calendarHtml+='<button class="'+classes+'" data-date="'+date+'">'+d.getDate()+dot+"</button>";
   }
@@ -90,7 +91,7 @@ function render(){
   document.querySelectorAll("[data-date]").forEach(function(button){
     button.onclick=function(){chosen=button.dataset.date;render();openForm(chosen)};
   });
-  const selected=data.filter(function(x){return x.date===chosen&&x.status!=="rejected"});
+  const selected=data.filter(function(x){return x.date===chosen&&x.status!=="rejected"&&x.status!=="cancelled"});
   $("#dayTitle").textContent=th(new Date(chosen+"T00:00:00"));
   $("#dayCount").textContent=selected.length?selected.length+" รายการจอง":"ยังไม่มีรายการจอง";
   $("#bookings").innerHTML=selected.length?selected.map(function(x){
@@ -111,14 +112,14 @@ function render(){
   document.querySelectorAll("[data-menu-toggle]").forEach(function(button){button.onclick=function(event){event.stopPropagation();document.querySelectorAll(".moreMenu").forEach(function(menu){if(menu.id!=="menu-"+button.dataset.menuToggle)menu.hidden=true});const menu=$("#menu-"+button.dataset.menuToggle);menu.hidden=!menu.hidden}});
   const ownBookings=historyData;
   $("#historyView").hidden=!currentEmployee||$("#historyView").hidden;
-  $("#historyList").innerHTML=ownBookings.length?ownBookings.map(function(x){return historyEntry(x,true)}).join(""):'<p style="text-align:center;color:#98a5b6;padding:28px">ยังไม่มีประวัติการจอง</p>';
+  $("#historyList").innerHTML=ownBookings.length?ownBookings.map(historyEntry).join(""):'<p style="text-align:center;color:#98a5b6;padding:28px">ยังไม่มีประวัติการจอง</p>';
   const adminHistory=data.filter(function(x){return x.status!=="pending"});
-  $("#adminHistoryList").innerHTML=adminHistory.length?adminHistory.map(function(x){return historyEntry(x,true)}).join(""):'<p style="text-align:center;color:#98a5b6;padding:28px">ยังไม่มีประวัติการพิจารณา</p>';
+  $("#adminHistoryList").innerHTML=adminHistory.length?adminHistory.map(historyEntry).join(""):'<p style="text-align:center;color:#98a5b6;padding:28px">ยังไม่มีประวัติการพิจารณา</p>';
 }
 async function syncPublicCalendar(){
   if(!isAdmin())return;
   try{
-    const active=data.filter(function(item){return item.status!=="rejected"});
+    const active=data.filter(function(item){return item.status!=="rejected"&&item.status!=="cancelled"});
     await Promise.all(active.map(function(item){return setDoc(doc(db,"publicBookings",item.id),{date:item.date,time:item.time,status:item.status,title:"ไม่ว่าง"})}));
     notice("ซิงก์รายการบนปฏิทินแล้ว "+active.length+" รายการ");
   }catch(err){notice("ซิงก์ไม่สำเร็จ: "+err.message)}
@@ -136,7 +137,7 @@ function subscribeHistory(){
   },function(err){notice("ยังดึงประวัติไม่ได้: "+err.message,true)});
 }
 async function writeHistory(id,booking,extra={}){
-  const record=Object.assign({requesterCode:booking.requesterCode||currentEmployee?.code||"",requesterUid:booking.requesterUid||currentUser?.uid||"",title:booking.title,date:booking.date,time:booking.time,person:booking.person,phone:booking.phone||"",dept:booking.dept,status:booking.status,decisionReason:booking.decisionReason||"",decidedBy:booking.decidedBy||"",createdAt:booking.createdAt||serverTimestamp(),decidedAt:booking.decidedAt||null},extra);
+  const record=Object.assign({requesterCode:booking.requesterCode||currentEmployee?.code||"",requesterUid:booking.requesterUid||currentUser?.uid||"",title:booking.title,date:booking.date,time:booking.time,person:booking.person,phone:booking.phone||"",dept:booking.dept,status:booking.status,decisionReason:booking.decisionReason||"",decidedBy:booking.decidedBy||"",createdAt:booking.createdAt||serverTimestamp(),updatedAt:booking.updatedAt||null,decidedAt:booking.decidedAt||null,cancelledAt:booking.cancelledAt||null},extra);
   // Keep the full administrative history and the employee's own history in
   // separate paths.  The latter is what the employee screen reads.
   await setDoc(doc(db,"bookingHistory",id),record,{merge:true});
@@ -166,7 +167,7 @@ function subscribeBookings(){
   const syncPublic=function(change){
     if(change.type==="removed"){deleteDoc(doc(db,"publicBookings",change.doc.id)).catch(function(){});return}
     const booking=change.doc.data();
-    if(booking.status!=="rejected"){
+    if(booking.status!=="rejected"&&booking.status!=="cancelled"){
       setDoc(doc(db,"publicBookings",change.doc.id),{date:booking.date,time:booking.time,status:booking.status,title:"ไม่ว่าง"}).catch(function(){});
     }else{
       deleteDoc(doc(db,"publicBookings",change.doc.id)).catch(function(){});
@@ -229,9 +230,9 @@ async function cancelBooking(id){
   if(!confirm("ยืนยันการยกเลิก "+item.title+"? ช่วงเวลานี้จะกลับมาว่างทันที"))return;
   try{
     await deleteDoc(doc(db,"publicBookings",id));
-    await deleteDoc(doc(db,"bookingHistory",id));
-    await deleteDoc(doc(db,"bookings",id));
-    notice("ยกเลิกรายการแล้ว — ช่วงเวลากลับมาว่าง");
+    await updateDoc(doc(db,"bookings",id),{status:"cancelled",cancelledAt:serverTimestamp()});
+    await writeHistory(id,Object.assign({},item,{status:"cancelled"}),{cancelledAt:serverTimestamp()});
+    notice("ยกเลิกรายการแล้ว — เก็บประวัติไว้แล้ว");
   }catch(err){notice("ยกเลิกไม่สำเร็จ: "+err.message)}
 }
 async function decide(id,status){
@@ -273,8 +274,8 @@ $("#form").onsubmit=async e=>{
     if(editingId){
       const existing=data.find(function(x){return x.id===editingId});
       const updated=Object.assign({},existing,{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value});
-      await updateDoc(doc(db,"bookings",editingId),{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value});
-      await writeHistory(editingId,updated);
+      await updateDoc(doc(db,"bookings",editingId),{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value,updatedAt:serverTimestamp()});
+      await writeHistory(editingId,updated,{updatedAt:serverTimestamp()});
       if(existing&&existing.status==="approved")await setDoc(doc(db,"publicBookings",editingId),{date,time:startTime+" - "+endTime,status:"approved",title:"ไม่ว่าง"});
       hideForm();chosen=date;render();notice("บันทึกการแก้ไขแล้ว");
     }else{
