@@ -49,7 +49,7 @@ function hideLogin(){$("#loginWrap").hidden=true;$("#loginForm").reset();toggleG
 function openForm(date){if(!currentEmployee){openLogin();notice("กรุณากรอกรหัสพนักงานก่อนจองห้องประชุม");return}resetForm();fillRequesterProfile();chosen=date;$("#bookingDate").value=date;$("#formWrap").hidden=false}
 function openEdit(id){const item=data.find(function(x){return x.id===id});if(!item||!currentEmployee)return;editingId=id;chosen=item.date;const times=item.time.split(" - ");$("#bookingDate").value=item.date;$("#topic").value=item.title;$("#start").value=times[0];$("#end").value=times[1];$("#person").value=item.person;$("#phone").value=item.phone||"";$("#dept").value=item.dept;$("#formTitle").textContent="แก้ไขรายการจอง";$("#formSubmit").textContent="บันทึกการแก้ไข";$("#formWrap").hidden=false}
 function statusLabel(status){return status==="approved"?"อนุมัติแล้ว":status==="rejected"?"ไม่อนุมัติ":"รออนุมัติ"}
-function formatStamp(value,withSeconds=false){if(!value)return "กำลังบันทึกเวลา…";const date=value.toDate?value.toDate():new Date(value.seconds?value.seconds*1000:value);return isNaN(date)?"-":date.toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:withSeconds?"2-digit":undefined})}
+function formatStamp(value,withSeconds=false,withMilliseconds=false){if(!value)return "กำลังบันทึกเวลา…";const date=value.toDate?value.toDate():new Date(value.seconds?value.seconds*1000:value);if(isNaN(date))return "-";const stamp=date.toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:withSeconds?"2-digit":undefined});return withMilliseconds&&withSeconds?stamp+"."+String(date.getMilliseconds()).padStart(3,"0"):stamp}
 function createdAtMillis(value){if(!value)return Number.MAX_SAFE_INTEGER;if(typeof value.toMillis==="function")return value.toMillis();if(value.seconds)return value.seconds*1000+(value.nanoseconds||0)/1000000;const millis=new Date(value).getTime();return isNaN(millis)?Number.MAX_SAFE_INTEGER:millis}
 function historyEntry(x,includeDecision){
   const style=x.status==="approved"?"ok":x.status==="rejected"?"no":"waits";
@@ -69,7 +69,7 @@ function updateAuthBox(){
   $("#adminHistoryNav").style.display=isAdmin()?"":"none";
 }
 function render(){
-  const pending=data.filter(function(x){return x.status==="pending"}).sort(function(a,b){return createdAtMillis(a.createdAt)-createdAtMillis(b.createdAt)}), approved=data.filter(function(x){return x.status==="approved"});
+  const pending=data.filter(function(x){return x.status==="pending"}).sort(function(a,b){const diff=createdAtMillis(a.createdAt)-createdAtMillis(b.createdAt);return diff||String(a.id).localeCompare(String(b.id))}), approved=data.filter(function(x){return x.status==="approved"});
   $("#total").textContent=data.length;
   $("#pendingNo").textContent=pending.length;
   $("#approvedNo").textContent=approved.length;
@@ -101,8 +101,8 @@ function render(){
     const controls=canManage?'<div class="more"><button class="moreBtn" data-menu-toggle="'+x.id+'" aria-label="ตัวเลือกเพิ่มเติม">⋯</button><div class="moreMenu" id="menu-'+x.id+'" hidden>'+((isAdmin()||x.status==="pending")?'<button data-edit="'+x.id+'">แก้ไข</button>':"")+'<button class="danger" data-cancel-booking="'+x.id+'">ยกเลิก</button></div></div>':"";
     return '<article class="booking"><div class="time">'+x.time.split(" - ")[0]+'<small>'+x.time.split(" - ")[1]+'</small></div><div class="line"></div><div class="info"><b>'+title+'</b><span>'+detail+'</span><em class="status '+style+'">'+statusLabel(x.status)+'</em></div>'+controls+'</article>';
   }).join(""):'<p style="text-align:center;color:#98a5b6;padding:80px 0;font-size:12px">ยังไม่มีรายการจอง<br><br>คลิกวันที่ที่ว่างเพื่อเข้าสู่ระบบและสร้างคำขอจอง</p>';
-  $("#pendingList").innerHTML=pending.length?pending.map(function(x,index){
-    return "<article class='request'><div class='rIcon'>"+(index+1)+"</div><div class='rmain'><b>" + x.title + "</b><span>วันที่ " + th(new Date(x.date+"T00:00:00")) + " · เวลา " + x.time + "</span><small>ผู้จอง: " + x.person + " · " + x.dept + " · โทร " + (x.phone||"-") + "</small><small><b>ส่งคำขอเมื่อ: </b>" + formatStamp(x.createdAt,true) + "</small></div><div class='actions'><button class='approve' data-ok='" + x.id + "'>✓ อนุมัติ</button><button class='reject' data-no='" + x.id + "'>ไม่อนุมัติ</button></div></article>";
+  $("#pendingList").innerHTML=pending.length?pending.map(function(x){
+    return "<article class='request'><div class='rIcon' aria-label='เวลาส่งคำขอ'>◷</div><div class='rmain'><b>" + x.title + "</b><span>วันที่ " + th(new Date(x.date+"T00:00:00")) + " · เวลา " + x.time + "</span><small>ผู้จอง: " + x.person + " · " + x.dept + " · โทร " + (x.phone||"-") + "</small><small><b>ส่งเมื่อ: </b>" + formatStamp(x.createdAt,true,true) + "</small></div><div class='actions'><button class='approve' data-ok='" + x.id + "'>✓ อนุมัติ</button><button class='reject' data-no='" + x.id + "'>ไม่อนุมัติ</button></div></article>";
   }).join(""):"<p style='text-align:center;color:#98a5b6;padding:50px'>ไม่มีคำขอรออนุมัติ</p>";
   document.querySelectorAll("[data-ok]").forEach(function(button){button.onclick=function(){decide(button.dataset.ok,"approved")}});
   document.querySelectorAll("[data-no]").forEach(function(button){button.onclick=function(){decide(button.dataset.no,"rejected")}});
