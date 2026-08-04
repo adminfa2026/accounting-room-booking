@@ -30,14 +30,16 @@ service cloud.firestore {
       // employee-code history path below.
       allow get, list: if isAdmin();
       allow create: if signedIn();
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (signedIn() && request.resource.data.requesterUid == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
     match /employeeHistory/{employeeCode}/entries/{bookingId} {
       // The user expressly accepted employee-code-only history access. Keeping
       // entries beneath the requested code prevents browsing the whole history.
       allow get, list, create: if signedIn();
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (signedIn() && request.resource.data.requesterUid == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
     match /publicBookings/{bookingId} {
@@ -65,7 +67,7 @@ service cloud.firestore {
         signedIn() &&
         resource.data.status == "pending" &&
         resource.data.requesterUid == request.auth.uid &&
-        request.resource.data.status == "pending" &&
+        request.resource.data.status in ["pending", "cancelled"] &&
         request.resource.data.requesterUid == resource.data.requesterUid
       );
 
