@@ -29,16 +29,21 @@ service cloud.firestore {
       // Full history is reserved for admins. Employees read only their separate,
       // employee-code history path below.
       allow get, list: if isAdmin();
-      allow create: if signedIn();
-      allow update: if isAdmin() || (signedIn() && request.resource.data.requesterUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.requesterUid == request.auth.uid;
+      allow update: if isAdmin() || (signedIn() &&
+        resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.requesterUid == resource.data.requesterUid);
       allow delete: if isAdmin();
     }
 
     match /employeeHistory/{employeeCode}/entries/{bookingId} {
       // The user expressly accepted employee-code-only history access. Keeping
       // entries beneath the requested code prevents browsing the whole history.
-      allow get, list, create: if signedIn();
-      allow update: if isAdmin() || (signedIn() && request.resource.data.requesterUid == request.auth.uid);
+      allow get, list: if isAdmin() || (signedIn() && resource.data.requesterUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.requesterUid == request.auth.uid;
+      allow update: if isAdmin() || (signedIn() &&
+        resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.requesterUid == resource.data.requesterUid);
       allow delete: if isAdmin();
     }
 
@@ -48,7 +53,10 @@ service cloud.firestore {
         request.resource.data.keys().hasOnly(['date', 'time', 'status', 'title']) &&
         request.resource.data.status == "pending" &&
         request.resource.data.title == "ไม่ว่าง");
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (isBookingOwner(bookingId) &&
+        request.resource.data.keys().hasOnly(['date', 'time', 'status', 'title']) &&
+        request.resource.data.status == "pending" &&
+        request.resource.data.title == "ไม่ว่าง");
       allow delete: if isAdmin() || isBookingOwner(bookingId);
     }
 
