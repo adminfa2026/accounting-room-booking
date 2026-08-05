@@ -145,7 +145,7 @@ function subscribeHistory(){
   // Employee history is stored under that employee's code.  Do not query the
   // admin-only bookingHistory collection here: that was the source of the
   // "Missing or insufficient permissions" message on phones and desktops.
-  historyUnsub=onSnapshot(collection(db,"employeeHistory",currentEmployee.code,"entries"),function(snap){
+  historyUnsub=onSnapshot(query(collection(db,"employeeHistory",currentEmployee.code,"entries"),where("requesterUid","==",currentUser.uid)),function(snap){
     historyData=snap.docs.map(function(item){return Object.assign({id:item.id},item.data())}).sort(timelineNewestFirst);
     render();
   },function(err){notice("ยังดึงประวัติไม่ได้: "+err.message,true)});
