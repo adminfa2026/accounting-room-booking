@@ -37,11 +37,19 @@ service cloud.firestore {
     }
 
     match /employeeHistory/{employeeCode}/entries/{bookingId} {
-      // The user expressly accepted employee-code-only history access. Keeping
-      // entries beneath the requested code prevents browsing the whole history.
-      allow get, list: if isAdmin() || (signedIn() && resource.data.requesterUid == request.auth.uid);
-      allow create: if signedIn() && request.resource.data.requesterUid == request.auth.uid;
+      // All devices logged in with the same employee code read the same path.
+      // Anonymous UIDs are deliberately not used for reads because Firebase
+      // assigns a different anonymous UID to each browser/device.
+      // The employee code is already the parent document key. Reading the
+      // collection directly also keeps legacy entries that predate the
+      // requesterCode field visible on every device using the same code.
+      allow get, list: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.requesterCode == employeeCode &&
+        request.resource.data.requesterUid == request.auth.uid;
       allow update: if isAdmin() || (signedIn() &&
+        resource.data.requesterCode == employeeCode &&
+        request.resource.data.requesterCode == employeeCode &&
         resource.data.requesterUid == request.auth.uid &&
         request.resource.data.requesterUid == resource.data.requesterUid);
       allow delete: if isAdmin();
@@ -52,11 +60,15 @@ service cloud.firestore {
       allow create: if isAdmin() || (signedIn() &&
         request.resource.data.keys().hasOnly(['date', 'time', 'status', 'person']) &&
         request.resource.data.status == "pending" &&
-        request.resource.data.person is string);
+        request.resource.data.date == get(/databases/$(database)/documents/bookings/$(bookingId)).data.date &&
+        request.resource.data.time == get(/databases/$(database)/documents/bookings/$(bookingId)).data.time &&
+        request.resource.data.person == get(/databases/$(database)/documents/bookings/$(bookingId)).data.person);
       allow update: if isAdmin() || (isBookingOwner(bookingId) &&
         request.resource.data.keys().hasOnly(['date', 'time', 'status', 'person']) &&
         request.resource.data.status == "pending" &&
-        request.resource.data.person is string);
+        request.resource.data.date == get(/databases/$(database)/documents/bookings/$(bookingId)).data.date &&
+        request.resource.data.time == get(/databases/$(database)/documents/bookings/$(bookingId)).data.time &&
+        request.resource.data.person == get(/databases/$(database)/documents/bookings/$(bookingId)).data.person);
       allow delete: if isAdmin() || isBookingOwner(bookingId);
     }
 
