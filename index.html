@@ -51,23 +51,10 @@ function openEdit(id){const item=data.find(function(x){return x.id===id});if(!it
 function statusLabel(status){return status==="approved"?"อนุมัติแล้ว":status==="rejected"?"ไม่อนุมัติ":status==="cancelled"?"ยกเลิกแล้ว":"รออนุมัติ"}
 function formatStamp(value,withSeconds=false,withMilliseconds=false){if(!value)return "กำลังบันทึกเวลา…";const date=value.toDate?value.toDate():new Date(value.seconds?value.seconds*1000:value);if(isNaN(date))return "-";const stamp=date.toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:withSeconds?"2-digit":undefined});return withMilliseconds&&withSeconds?stamp+"."+String(date.getMilliseconds()).padStart(3,"0"):stamp}
 function createdAtMillis(value){if(!value)return Number.MAX_SAFE_INTEGER;if(typeof value.toMillis==="function")return value.toMillis();if(value.seconds)return value.seconds*1000+(value.nanoseconds||0)/1000000;const millis=new Date(value).getTime();return isNaN(millis)?Number.MAX_SAFE_INTEGER:millis}
-function timelineEvents(x){
-  return [['ส่งคำขอ',x.createdAt],['แก้ไขคำขอ',x.updatedAt],[(x.status==="approved"?"แอดมินอนุมัติ":x.status==="rejected"?"แอดมินไม่อนุมัติ":""),x.decidedAt],[(x.status==="cancelled"?"ยกเลิกคำขอ":""),x.cancelledAt]]
-    .filter(function(event){return event[0]&&event[1]})
-    .sort(function(a,b){return createdAtMillis(a[1])-createdAtMillis(b[1])});
-}
-function latestTimelineMillis(x){
-  const events=timelineEvents(x);
-  return events.length?createdAtMillis(events[events.length-1][1]):createdAtMillis(x.createdAt);
-}
-function timelineNewestFirst(a,b){
-  const diff=latestTimelineMillis(b)-latestTimelineMillis(a);
-  return diff||String(b.id||"").localeCompare(String(a.id||""));
-}
 function historyEntry(x){
   const style=x.status==="approved"?"ok":x.status==="rejected"||x.status==="cancelled"?"no":"waits";
   const reason=x.status==="rejected"&&x.decisionReason?'<span style="color:#c65851">เหตุผล: '+x.decisionReason+"</span>":"";
-  const events=timelineEvents(x);
+  const events=[['ส่งคำขอ',x.createdAt],['แก้ไขคำขอ',x.updatedAt],[(x.status==="approved"?"แอดมินอนุมัติ":x.status==="rejected"?"แอดมินไม่อนุมัติ":""),x.decidedAt],[(x.status==="cancelled"?"ยกเลิกคำขอ":""),x.cancelledAt]].filter(function(event){return event[0]&&event[1]});
   const timeline=events.map(function(event){return '<small>◷ <b>'+event[0]+':</b> '+formatStamp(event[1],true,true)+'</small>'}).join("");
   return '<article class="historyEntry"><div><b>'+x.title+'</b><span>วันที่จอง: '+x.date+" · "+x.time+"</span>"+reason+'<em class="status '+style+'" style="position:static;display:inline-block;margin-top:8px">'+statusLabel(x.status)+'</em></div><div class="historyMeta"><strong>Timeline คำขอ</strong>'+timeline+'</div></article>';
 }
@@ -126,7 +113,7 @@ function render(){
   const ownBookings=historyData;
   $("#historyView").hidden=!currentEmployee||$("#historyView").hidden;
   $("#historyList").innerHTML=ownBookings.length?ownBookings.map(historyEntry).join(""):'<p style="text-align:center;color:#98a5b6;padding:28px">ยังไม่มีประวัติการจอง</p>';
-  const adminHistory=data.filter(function(x){return x.status!=="pending"}).sort(timelineNewestFirst);
+  const adminHistory=data.filter(function(x){return x.status!=="pending"});
   $("#adminHistoryList").innerHTML=adminHistory.length?adminHistory.map(historyEntry).join(""):'<p style="text-align:center;color:#98a5b6;padding:28px">ยังไม่มีประวัติการพิจารณา</p>';
 }
 async function syncPublicCalendar(){
@@ -145,7 +132,7 @@ function subscribeHistory(){
   // admin-only bookingHistory collection here: that was the source of the
   // "Missing or insufficient permissions" message on phones and desktops.
   historyUnsub=onSnapshot(collection(db,"employeeHistory",currentEmployee.code,"entries"),function(snap){
-    historyData=snap.docs.map(function(item){return Object.assign({id:item.id},item.data())}).sort(timelineNewestFirst);
+    historyData=snap.docs.map(function(item){return Object.assign({id:item.id},item.data())}).sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""))});
     render();
   },function(err){notice("ยังดึงประวัติไม่ได้: "+err.message,true)});
 }
@@ -289,7 +276,7 @@ $("#form").onsubmit=async e=>{
       const updated=Object.assign({},existing,{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value});
       await updateDoc(doc(db,"bookings",editingId),{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value,updatedAt:serverTimestamp()});
       await writeHistory(editingId,updated,{updatedAt:serverTimestamp()});
-      if(existing&&existing.status!=="rejected"&&existing.status!=="cancelled")await setDoc(doc(db,"publicBookings",editingId),{date,time:startTime+" - "+endTime,status:existing.status,title:"ไม่ว่าง"});
+      if(existing&&existing.status==="approved")await setDoc(doc(db,"publicBookings",editingId),{date,time:startTime+" - "+endTime,status:"approved",title:"ไม่ว่าง"});
       hideForm();chosen=date;render();notice("บันทึกการแก้ไขแล้ว");
     }else{
       const bookingRef=await addDoc(collection(db,"bookings"),{title,date,time:startTime+" - "+endTime,person,phone,dept:$("#dept").value,status:"pending",requesterEmail:currentUser.email||"",requesterCode:currentEmployee.code,requesterUid:currentUser.uid,createdAt:serverTimestamp()});
